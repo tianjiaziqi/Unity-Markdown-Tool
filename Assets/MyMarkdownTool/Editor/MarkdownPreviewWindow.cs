@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.IO;
 using UnityEditor;
 using UnityEngine;
@@ -7,6 +8,8 @@ public class MarkdownPreviewWindow : EditorWindow
 {
     private string currentFilePath;
     private VisualElement container;
+    private MarkdownParser parser = new MarkdownParser();
+    private MarkdownStyleConfig styleConfig;
     
     [MenuItem("Tools/Markdown Preview")]
     public static void ShowWindowFromMenu()
@@ -32,11 +35,32 @@ public class MarkdownPreviewWindow : EditorWindow
     {
         if (string.IsNullOrEmpty(currentFilePath)) return;
 
+        if (styleConfig == null)
+        {
+            string[] guids = AssetDatabase.FindAssets("t:MarkdownStyleConfig");
+            if (guids.Length > 0)
+            {
+                // TODO: Warning when more than one style config is found
+                string path = AssetDatabase.GUIDToAssetPath(guids[0]);
+                styleConfig = AssetDatabase.LoadAssetAtPath<MarkdownStyleConfig>(path);
+            }
+            else
+            {
+                Debug.LogError("No MarkdownStyleConfig asset found");
+                return;
+            }
+        }
+
         string content = File.ReadAllText(currentFilePath);
-        rootVisualElement.Clear();
-        var label = new Label(content);
-        label.style.whiteSpace = WhiteSpace.Normal;
-        rootVisualElement.Add(label);
+        List<MarkdownBlockBase> blocks = parser.Parse(content);
+
+        container.Clear();
+
+        foreach (var block in blocks)
+        {
+            var element = block.CreateElement(styleConfig);
+            container.Add(element);
+        }
     }
 
     public void CreateGUI()
